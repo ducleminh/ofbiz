@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entitymodel xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://ofbiz.apache.org/dtds/entitymodel.xsd">
+    <!-- ========================================================= -->
+    <!-- ======================== Defaults ======================= -->
+    <!-- ========================================================= -->
+    <title>Entity of EasyPOS Component</title>
+    <description>None</description>
+    <copyright></copyright>
+    <version>1.0</version>
+
+    <entity entity-name="EasyPosProductStoreTable"
+            package-name="org.easypos.store"
+            title="Product Store Table Entity">
+        <field name="productStoreId" type="id-ne"></field>
+        <field name="tableName" type="short-varchar"></field>
+        <field name="fromDate" type="date-time"></field>
+        <field name="thruDate" type="date-time"></field>
+        <prim-key field="productStoreId"/>
+        <prim-key field="tableName"/>
+        <prim-key field="fromDate"/>
+        <relation type="one" fk-name="PRDSTRKWO_PRDS" rel-entity-name="ProductStore">
+            <key-map field-name="productStoreId"/>
+        </relation>
+    </entity>
+
+</entitymodel>

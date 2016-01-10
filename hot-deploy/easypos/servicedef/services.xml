@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://ofbiz.apache.org/dtds/services.xsd">
+    <description>EasyPOS Services</description>
+    <vendor></vendor>
+    <version>1.0</version>
+
+    <service name="noSyntaxError" engine="interface">
+        <description>
+            Dummy service to prevent empty files and syntax error - Remove when the 1st real service will be added here 
+        </description>
+    </service>
+
+    <service name="getAllStoresPerOwner" engine="java"
+             location="org.easypos.store.EasyPosProductStoreWorker" invoke="getAllStoresPerOwner">
+        <description>
+            Returns list of stores registered for the logged-in user
+        </description>
+        <attribute type="java.util.List" mode="OUT" name="stores" optional="true"/>
+        <attribute type="String" mode="OUT" name="partyId" optional="true"/>
+        <attribute type="String" mode="OUT" name="contactMechId" optional="true"/>
+        <attribute type="java.util.List" mode="OUT" name="defaultFacility" optional="true"/>
+    </service>
+
+    <service name="createNewCompleteStore" engine="java"
+             location="org.easypos.store.EasyPosProductStoreWorker" invoke="createNewCompleteStore">
+        <description>
+            Create a new store with a default catalog
+        </description>
+        <attribute type="String" mode="IN" name="storeName" optional="false"/>
+        <attribute type="String" mode="IN" name="menuName" optional="false"/>
+        <attribute type="String" mode="IN" name="storeDefaultCurrency" optional="false"/>
+        <attribute type="String" mode="IN" name="facilityId" optional="false"/>
+        <attribute type="List" mode="IN" name="tableIdList" optional="false"/>
+        <attribute type="String" mode="OUT" name="storeId" optional="true"/>
+        <attribute type="String" mode="OUT" name="storeName" optional="true"/>
+        <attribute type="String" mode="OUT" name="menuId" optional="true"/>
+        <attribute type="String" mode="OUT" name="menuName" optional="true"/>
+        <attribute type="String" mode="OUT" name="categoryId" optional="true"/>
+        <attribute type="String" mode="OUT" name="defaultCurrency" optional="true"/>
+        <attribute type="Boolean" mode="OUT" name="storeExisted" optional="true"/>
+    </service>
+
+    <service name="addMultipleProductsToCategory" engine="java"
+             location="org.easypos.product.EasyPosProductWorker" invoke="addMultipleProductsToCategory">
+        <description>
+            Add all products to a category
+        </description>
+        <attribute type="String" mode="IN" name="categoryId" optional="false"/>
+        <attribute type="String" mode="IN" name="productIdList" optional="false"/>
+        <attribute type="java.util.List" mode="OUT" name="productsAdded" optional="false"/>
+    </service>
+
+    <service name="findAllProductTagsPerOwner" engine="java"
+             location="org.easypos.category.EasyPosProductTagWorker" invoke="findAllProductTagsPerOwner">
+        <description>
+            Returns list of categories owned by the logged-in user
+        </description>
+        <attribute type="java.util.List" mode="OUT" name="tags" optional="false"/>
+    </service>
+
+    <service name="addNewProduct" engine="java"
+             location="org.easypos.product.EasyPosProductWorker" invoke="addNewProduct">
+        <description>
+            Add new product with price, multiple categories, and an owner
+        </description>
+        <attribute type="String" mode="IN" name="internalName" optional="false"/>
+        <attribute type="String" mode="IN" name="currencyUomId" optional="false"/>
+        <attribute type="java.math.BigDecimal" mode="IN" name="price" optional="false"/>
+        <attribute type="String" mode="IN" name="productTags" optional="true"/>
+        <attribute type="String" mode="OUT" name="newProductId" optional="true"/>
+    </service>
+
+    <service name="getAllProductsPerOwner" engine="java"
+             location="org.easypos.product.EasyPosProductWorker" invoke="getAllProductsPerOwner">
+        <description>
+            Retrive all products per owner
+        </description>
+        <attribute type="java.util.List" mode="OUT" name="products" optional="false"/>
+    </service>
+
+    <service name="getAllProductsPerStoreAndMenu" engine="java"
+             location="org.easypos.product.EasyPosProductWorker" invoke="getAllProductsPerStoreAndMenu">
+        <description>
+            Retrive all products per store per menu
+        </description>
+        <attribute type="String" mode="IN" name="storeId" optional="false"/>
+        <attribute type="String" mode="IN" name="menuId" optional="false"/>
+        <attribute type="java.util.List" mode="OUT" name="products" optional="false"/>
+    </service>
+
+    <service name="createProductStoreTable" default-entity-name="EasyPosProductStoreTable" engine="entity-auto" invoke="create" auth="true">
+        <description>Create a Product Store Table</description>
+        <auto-attributes include="pk" mode="IN" optional="false"/>
+        <auto-attributes include="nonpk" mode="IN" optional="true"/>
+    </service>getAllOrderDefaultParams
+
+    <service name="getAllOrderDefaultParams" engine="java"
+             location="org.easypos.order.sales.EasyPosOrderDefaultParamWorker" invoke="getAllOrderDefaultParams">
+        <description>
+            Retrive all default params used in order-related services
+        </description>
+        <attribute type="java.util.Map" mode="OUT" name="defaultCreateSalesOrderParams" optional="false"/>
+        <attribute type="java.util.Map" mode="OUT" name="defaultCompleteSalesOrderParams" optional="false"/>
+        <attribute type="java.util.Map" mode="OUT" name="defaultCreateInventoryItemsParams" optional="false"/>
+        <attribute type="java.util.Map" mode="OUT" name="defaultCreateCustomerParams" optional="false"/>
+    </service>
+
+    <service name="cancelSalesOrder" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="cancelSalesOrder">
+        <description>
+            Cancel sales order
+        </description>
+        <attribute type="String" mode="IN" name="orderId" optional="false"/>
+        <attribute type="String" mode="IN" name="statusId" optional="false"/>
+        <attribute type="String" mode="IN" name="setItemStatus" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
+    <service name="createNewEasyPosSalesOrder" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="createNewEasyPosSalesOrder">
+        <description>
+            Create a new sales order
+        </description>
+        <attribute name="request" mode="IN" type="javax.servlet.http.HttpServletRequest"/>
+        <attribute name="response" mode="IN" type="javax.servlet.http.HttpServletResponse"/>
+        <attribute type="String" mode="IN" name="productStoreId" optional="false"/>
+        <attribute type="String" mode="IN" name="finalizeMode" optional="false"/>
+        <attribute type="String" mode="IN" name="orderMode" optional="false"/>
+        <attribute type="String" mode="IN" name="userLoginId" optional="false"/>
+        <attribute type="String" mode="OUT" name="salesOrderId" optional="false"/>
+    </service>
+
+    <service name="completeSalesOrder" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="completeSalesOrder">
+        <description>
+            Approve,complete sales order
+        </description>
+        <attribute type="String" mode="IN" name="facilityId" optional="false"/>
+        <attribute type="String" mode="IN" name="orderId" optional="false"/>
+        <attribute type="String" mode="IN" name="invoicePerShipment" optional="false"/>
+        <attribute type="String" mode="IN" name="setItemStatus" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
+    <service name="updateItemStatusSalesOrder" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="updateItemStatusSalesOrder">
+        <description>
+            Update status of order items
+        </description>
+        <attribute type="List" mode="IN" name="orderItemSeqAndStatusId" optional="true"/>
+        <attribute type="String" mode="IN" name="orderId" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
+    <service name="getAllAvailableCurrencies" engine="java"
+             location="org.easypos.store.EasyPosProductStoreWorker" invoke="getAllAvailableCurrencies">
+        <description>
+            Get all available currencies
+        </description>
+        <attribute type="java.util.List" mode="OUT" name="currencies" optional="false"/>
+    </service>
+
+    <service name="getAllOrdersByStoreByCreator" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="getAllOrdersByStoreByCreator">
+        <description>
+            Update status of order items
+        </description>
+        <attribute type="String" mode="IN" name="productStoreId" optional="false"/>
+        <attribute type="String" mode="IN" name="orderTypeId" optional="false"/>
+        <attribute type="java.util.List" mode="IN" name="orderStatusId" optional="false"/>
+        <attribute type="java.util.Map" mode="OUT" name="orders" optional="false"/>
+    </service>
+
+    <service name="appendItemToExistingOrder" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="appendItemToExistingOrder">
+        <description>
+            append items to existing orders
+        </description>
+        <attribute type="String" mode="IN" name="orderId" optional="false"/>
+        <attribute type="List" mode="IN" name="productAndQuantity" optional="false"/>
+        <attribute type="String" mode="IN" name="facilityId" optional="false"/>
+        <attribute type="String" mode="IN" name="inventoryItemTypeId" optional="false"/>
+        <attribute type="String" mode="IN" name="quantityRejected" optional="false"/>
+        <attribute type="String" mode="IN" name="unitCost" optional="false"/>
+        <attribute type="List" mode="OUT" name="orderItems" optional="false"/>
+    </service>
+
+    <service name="createInventoryItems" engine="java"
+             location="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="createInventoryItems">
+        <description>
+            create inventory for order items
+        </description>
+        <attribute type="String" mode="IN" name="facilityId" optional="false"/>
+        <attribute type="List" mode="IN" name="productAndQuantity" optional="false"/>
+        <attribute type="String" mode="IN" name="inventoryItemTypeId" optional="false"/>
+        <attribute type="String" mode="IN" name="quantityRejected" optional="false"/>
+        <attribute type="String" mode="IN" name="unitCost" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
+    <service name="addTablesToProductStore" engine="java"
+             location="org.easypos.store.EasyPosProductStoreWorker" invoke="addTablesToProductStore" auth="true">
+        <description>Add tables To Product Store</description>
+        <attribute type="List" mode="IN" name="tableIdList" optional="false"/>
+        <attribute type="String" mode="IN" name="productStoreId" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
+</services>
