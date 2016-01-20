@@ -168,6 +168,8 @@
         </description>
         <attribute type="String" mode="IN" name="productStoreId" optional="false"/>
         <attribute type="String" mode="IN" name="orderTypeId" optional="false"/>
+        <attribute type="java.sql.Timestamp" mode="IN" name="lowerBoundDate" optional="false"/>
+        <attribute type="java.sql.Timestamp" mode="IN" name="upperBoundDate" optional="false"/>
         <attribute type="java.util.List" mode="IN" name="orderStatusId" optional="false"/>
         <attribute type="java.util.Map" mode="OUT" name="orders" optional="false"/>
     </service>

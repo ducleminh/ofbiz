@@ -3,7 +3,6 @@ package org.easypos.order.sales;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import javolution.util.FastMap;
-import org.apache.commons.io.FileUtils;
 import org.easypos.product.EasyPosProductWorker;
 import org.easypos.store.EasyPosProductStoreWorker;
 import org.ofbiz.base.util.UtilMisc;
@@ -13,7 +12,6 @@ import org.ofbiz.entity.GenericEntityException;
 import org.ofbiz.entity.GenericValue;
 import org.ofbiz.entity.condition.EntityCondition;
 import org.ofbiz.entity.condition.EntityOperator;
-import org.ofbiz.entity.jdbc.SQLProcessor;
 import org.ofbiz.entity.model.DynamicViewEntity;
 import org.ofbiz.entity.model.ModelKeyMap;
 import org.ofbiz.entity.util.EntityQuery;
@@ -22,17 +20,27 @@ import org.ofbiz.order.shoppingcart.CheckOutEvents;
 import org.ofbiz.order.shoppingcart.ShoppingCart;
 import org.ofbiz.order.shoppingcart.ShoppingCartEvents;
 import org.ofbiz.order.shoppingcart.ShoppingCartItem;
-import org.ofbiz.service.*;
+import org.ofbiz.service.DispatchContext;
+import org.ofbiz.service.GenericServiceException;
+import org.ofbiz.service.LocalDispatcher;
+import org.ofbiz.service.ServiceUtil;
+import org.ofbiz.service.ServiceContainer;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.*;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.Date;
 
 public class EasyPosSalesOrderWorker {
@@ -43,9 +51,9 @@ public class EasyPosSalesOrderWorker {
     private static final String ORDER_ITEM_CANCELLED_STATUS = "ITEM_CANCELLED";
     private static final String CUSTOMER_ROLE_IN_ORDER = "BILL_TO_CUSTOMER";
 
-    private static final String GET_ALL_ORDER_PER_STORE_PER_CREATOR_SQL= "./hot-deploy/easypos/sql/GetAllOrderPerStorePerCreator.sql";
+    //private static final String GET_ALL_ORDER_PER_STORE_PER_CREATOR_SQL= "./hot-deploy/easypos/sql/GetAllOrderPerStorePerCreator.sql";
 
-    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("d-M-yyyy HH:mm");
+    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public static Map<String, Object> getAllOrdersByStoreByCreator(DispatchContext dctx,
                                                                    Map<String, ? extends Object> context)
@@ -57,30 +65,20 @@ public class EasyPosSalesOrderWorker {
 
         String productStoreId = (String) context.get("productStoreId");
         String orderTypeId = (String) context.get("orderTypeId");
+        Timestamp upperBoundDate = (Timestamp) context.get("upperBoundDate");
+        Timestamp lowerBoundDate = (Timestamp) context.get("lowerBoundDate");
         List<String> orderStatusIdList = (List<String>) context.get("orderStatusId");
-        if (orderStatusIdList.size() < 4) {
-            return ServiceUtil.returnError("At least 4 order status are expected");
-        }
 
-        SQLProcessor sqlProcessor = new SQLProcessor(delegator, delegator.getGroupHelperInfo("org.ofbiz"));
-
-        //-----------------------------------------------------
-        // Get all stores per owner
-        String sql = FileUtils.readFileToString(new File(GET_ALL_ORDER_PER_STORE_PER_CREATOR_SQL) );
-        sqlProcessor.prepareStatement(sql);
-        PreparedStatement preparedStatement = sqlProcessor.getPreparedStatement();
-        preparedStatement.setString(1, orderTypeId);
-        preparedStatement.setString(2, productStoreId);
-        preparedStatement.setString(3, username);
-        preparedStatement.setString(4, ORDER_ITEM_CANCELLED_STATUS);
-        preparedStatement.setString(5, orderStatusIdList.get(0));
-        preparedStatement.setString(6, orderStatusIdList.get(1));
-        preparedStatement.setString(7, orderStatusIdList.get(2));
-        preparedStatement.setString(8, orderStatusIdList.get(3));
-
-        ResultSet rs = sqlProcessor.executeQuery();
-        Map<String, Order> orderIdToOrderMap = getOrdersFromResultSet(rs);
+        Map<String, Order> orderIdToOrderMap = getOrders(
+                delegator,
+                orderTypeId,
+                productStoreId,
+                username,
+                lowerBoundDate,
+                upperBoundDate,
+                orderStatusIdList);
         /*********************************************/
+
 
         //-----------------------------------------------------
         // Get all customers per order
@@ -129,6 +127,14 @@ public class EasyPosSalesOrderWorker {
         for (Order order : orderIdToOrderMap.values()) {
             String status = order.getOrderStatus();
             statusToOrdersMap.put(status, order);
+        }
+
+        if (statusToOrdersMap.isEmpty()) {
+            Order tempOrder = new Order();
+            for (String status : orderStatusIdList) {
+                statusToOrdersMap.put(status, tempOrder);
+                statusToOrdersMap.get(status).clear();
+            }
         }
 
         Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
@@ -187,13 +193,18 @@ public class EasyPosSalesOrderWorker {
         }
         /***************************************************/
 
+        String orderId = (String) request.getAttribute("orderId");
         Map<String,String> productIdToSeqIdMap = FastMap.newInstance();
         GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
-        List<GenericValue> queryResult = EntityQuery.use(delegator).from("OrderItem").where("orderId", request.getAttribute("orderId")).cache(true).queryList();
+        List<GenericValue> queryResult = EntityQuery.use(delegator).from("OrderItem").where("orderId", orderId).cache(false).queryList();
         for (GenericValue value : queryResult) {
             productIdToSeqIdMap.put((String) value.get("productId"), (String) value.get("orderItemSeqId"));
         }
 
+        GenericValue orderHeaderResult = EntityQuery.use(delegator).from("OrderHeader").where("orderId", orderId).cache(false).queryOne();
+        Timestamp orderTimestamp = (Timestamp) orderHeaderResult.get("orderDate");
+
+        request.setAttribute("orderDate", orderTimestamp.toLocalDateTime().format(dateTimeFormatter));
         request.setAttribute("seqIdMap", productIdToSeqIdMap);
 
         return "success";
@@ -475,28 +486,83 @@ public class EasyPosSalesOrderWorker {
         return resultMap;
     }
 
-    private static Map<String, Order> getOrdersFromResultSet(ResultSet rs) throws SQLException {
+    private static Map<String, Order> getOrders(GenericDelegator delegator,
+                                                String orderTypeId,
+                                                String productStoreId,
+                                                String createdByUsername,
+                                                Timestamp lowerBoundDate,
+                                                Timestamp upperBoundDate,
+                                                List<String> orderStatusIdList) throws GenericEntityException {
+        String orderHeaderAlias = "OH";
+        String orderItemAlias = "OI";
+        String productAlias = "P";
+        String productPriceAlias = "PP";
+
+        DynamicViewEntity allOrdersEntity = new DynamicViewEntity();
+        allOrdersEntity.addMemberEntity(orderHeaderAlias, "OrderHeader");
+        allOrdersEntity.addMemberEntity(orderItemAlias, "OrderItem");
+        allOrdersEntity.addMemberEntity(productAlias, "Product");
+        allOrdersEntity.addMemberEntity(productPriceAlias, "ProductPrice");
+
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "orderId", "orderId", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "statusId", "statusId", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "orderName", "orderName", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "createdBy", "createdBy", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "orderDate", "orderDate", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "orderTypeId", "orderTypeId", null, null, null, null);
+        allOrdersEntity.addAlias(orderHeaderAlias, orderHeaderAlias + "productStoreId", "productStoreId", null, null, null, null);
+        allOrdersEntity.addAlias(orderItemAlias, orderItemAlias + "orderItemSeqId", "orderItemSeqId", null, null, null, null);
+        allOrdersEntity.addAlias(orderItemAlias, orderItemAlias + "statusId", "statusId", null, null, null, null);
+        allOrdersEntity.addAlias(orderItemAlias, orderItemAlias + "productId", "productId", null, null, null, null);
+        allOrdersEntity.addAlias(orderItemAlias, orderItemAlias + "quantity", "quantity", null, null, null, null);
+        allOrdersEntity.addAlias(productAlias, productAlias + "internalName", "internalName", null, null, null, null);
+        allOrdersEntity.addAlias(productPriceAlias, productPriceAlias + "currencyUomId", "currencyUomId", null, null, null, null);
+        allOrdersEntity.addAlias(productPriceAlias, productPriceAlias + "price", "price", null, null, null, null);
+
+        allOrdersEntity.addViewLink(orderHeaderAlias, orderItemAlias, Boolean.TRUE, ModelKeyMap.makeKeyMapList("orderId"));
+        allOrdersEntity.addViewLink(orderItemAlias, productAlias, Boolean.TRUE, ModelKeyMap.makeKeyMapList("productId"));
+        allOrdersEntity.addViewLink(orderItemAlias, productPriceAlias, Boolean.TRUE, ModelKeyMap.makeKeyMapList("productId"));
+
+        EntityCondition orderTypeCondition = EntityCondition.makeCondition(orderHeaderAlias + "orderTypeId", orderTypeId);
+        EntityCondition productStoreCondition = EntityCondition.makeCondition(orderHeaderAlias + "productStoreId", productStoreId);
+        EntityCondition createdByCondition = EntityCondition.makeCondition(orderHeaderAlias + "createdBy", createdByUsername);
+        EntityCondition orderItemStatusNotCancelledCondition = EntityCondition.makeCondition(orderHeaderAlias + "statusId", EntityOperator.NOT_EQUAL, ORDER_ITEM_CANCELLED_STATUS);
+        EntityCondition orderHeaderStatusCondition = EntityCondition.makeCondition(orderHeaderAlias + "statusId", EntityOperator.IN, orderStatusIdList);
+        EntityCondition orderHeaderDateLowerBoundCondition = EntityCondition.makeCondition(orderHeaderAlias + "orderDate", EntityOperator.GREATER_THAN_EQUAL_TO, lowerBoundDate);
+        EntityCondition orderHeaderDateUpperBoundCondition = EntityCondition.makeCondition(orderHeaderAlias + "orderDate", EntityOperator.LESS_THAN_EQUAL_TO, upperBoundDate);
+
+        List<EntityCondition> allOrderConditions = new ArrayList<>();
+        allOrderConditions.add(orderTypeCondition);
+        allOrderConditions.add(productStoreCondition);
+        allOrderConditions.add(orderItemStatusNotCancelledCondition);
+        allOrderConditions.add(orderHeaderStatusCondition);
+        allOrderConditions.add(orderHeaderDateLowerBoundCondition);
+        allOrderConditions.add(orderHeaderDateUpperBoundCondition);
+        allOrderConditions.add(createdByCondition);
+
+        List<GenericValue> allOrdersResult = EntityQuery.use(delegator).from(allOrdersEntity).where(EntityCondition.makeCondition(allOrderConditions)).cache(false).queryList();
+
         Map<String, Order> orderIdToOrderMap = new HashMap<>();
-        while (rs.next()) {
-            String orderId = rs.getString("order_id");
-            String orderStatusId = rs.getString("order_status_id");
-            String orderName = rs.getString("order_name");
-            Timestamp orderTimeStamp = rs.getTimestamp("order_date");
-            String orderItemSeqId = rs.getString("order_item_seq_id");
-            String orderItemStatusId = rs.getString("order_item_status_id");
-            String productId = rs.getString("product_id");
-            String productName = rs.getString("product_name").toUpperCase();
-            float productPrice = rs.getFloat("price");
-            String currency = rs.getString("currency_uom_id");
-            int quantity = rs.getInt("quantity");
+        for (GenericValue result : allOrdersResult) {
+            String orderId = (String) result.get(orderHeaderAlias + "orderId");
+            String orderStatusId = (String) result.get(orderHeaderAlias + "statusId");
+            String orderName = (String) result.get(orderHeaderAlias + "orderName");
+            Timestamp orderTimeStamp = (Timestamp) result.get(orderHeaderAlias + "orderDate");
+            String orderItemSeqId = (String) result.get(orderItemAlias + "orderItemSeqId");
+            String orderItemStatusId = (String) result.get(orderItemAlias + "statusId");
+            String productId = (String) result.get(orderItemAlias + "productId");
+            String productName = (String) result.get(productAlias + "internalName");
+            BigDecimal productPrice = (BigDecimal) result.get(productPriceAlias + "price");
+            String currency = (String) result.get(productPriceAlias + "currencyUomId");
+            BigDecimal quantity = (BigDecimal) result.get(orderItemAlias + "quantity");
 
             OrderItem item = new OrderItem();
             item.setItemStatus(orderItemStatusId);
             item.setOrderSeqId(orderItemSeqId);
-            item.setQuantity(quantity);
+            item.setQuantity(quantity.intValue());
             EasyPosProductWorker.Product product = new EasyPosProductWorker.Product();
             product.setId(productId);
-            product.setPrice(productPrice);
+            product.setPrice(productPrice.floatValue());
             product.setName(productName);
             product.setCurrencySymbol(currency);
             item.setProduct(product);
