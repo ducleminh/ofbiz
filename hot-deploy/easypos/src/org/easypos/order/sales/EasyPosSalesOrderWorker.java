@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.HashMap;
@@ -204,7 +205,20 @@ public class EasyPosSalesOrderWorker {
         GenericValue orderHeaderResult = EntityQuery.use(delegator).from("OrderHeader").where("orderId", orderId).cache(false).queryOne();
         Timestamp orderTimestamp = (Timestamp) orderHeaderResult.get("orderDate");
 
-        request.setAttribute("orderDate", orderTimestamp.toLocalDateTime().format(dateTimeFormatter));
+        String[] timeZoneList = request.getParameterMap().get("timeZone");
+        String timeZone = null;
+        if (Objects.nonNull(timeZoneList) && timeZoneList.length > 0) {
+            timeZone = timeZoneList[0];
+        }
+
+        String formattedDateTime;
+        if (Objects.nonNull(timeZone)) {
+            formattedDateTime = orderTimestamp.toLocalDateTime().atZone(ZoneId.of(timeZone)).format(dateTimeFormatter);
+        } else {
+            formattedDateTime = orderTimestamp.toLocalDateTime().format(dateTimeFormatter);
+        }
+
+        request.setAttribute("orderDate", formattedDateTime);
         request.setAttribute("seqIdMap", productIdToSeqIdMap);
 
         return "success";
