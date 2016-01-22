@@ -128,7 +128,6 @@
         <attribute type="String" mode="IN" name="finalizeMode" optional="false"/>
         <attribute type="String" mode="IN" name="orderMode" optional="false"/>
         <attribute type="String" mode="IN" name="userLoginId" optional="false"/>
-        <attribute type="String" mode="IN" name="timeZone" optional="true"/>
         <attribute type="String" mode="OUT" name="salesOrderId" optional="false"/>
     </service>
 
@@ -169,6 +168,7 @@
         </description>
         <attribute type="String" mode="IN" name="productStoreId" optional="false"/>
         <attribute type="String" mode="IN" name="orderTypeId" optional="false"/>
+        <attribute type="String" mode="IN" name="timeZoneId" optional="false"/>
         <attribute type="java.sql.Timestamp" mode="IN" name="lowerBoundDate" optional="false"/>
         <attribute type="java.sql.Timestamp" mode="IN" name="upperBoundDate" optional="false"/>
         <attribute type="java.util.List" mode="IN" name="orderStatusId" optional="false"/>

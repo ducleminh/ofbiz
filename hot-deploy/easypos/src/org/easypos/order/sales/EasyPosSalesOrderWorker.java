@@ -5,6 +5,7 @@ import com.google.common.collect.ListMultimap;
 import javolution.util.FastMap;
 import org.easypos.product.EasyPosProductWorker;
 import org.easypos.store.EasyPosProductStoreWorker;
+import org.ofbiz.base.util.Debug;
 import org.ofbiz.base.util.UtilMisc;
 import org.ofbiz.entity.DelegatorFactory;
 import org.ofbiz.entity.GenericDelegator;
@@ -34,15 +35,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Date;
+import java.util.*;
 
 public class EasyPosSalesOrderWorker {
 
@@ -54,7 +49,7 @@ public class EasyPosSalesOrderWorker {
 
     //private static final String GET_ALL_ORDER_PER_STORE_PER_CREATOR_SQL= "./hot-deploy/easypos/sql/GetAllOrderPerStorePerCreator.sql";
 
-    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
 
     public static Map<String, Object> getAllOrdersByStoreByCreator(DispatchContext dctx,
                                                                    Map<String, ? extends Object> context)
@@ -68,6 +63,10 @@ public class EasyPosSalesOrderWorker {
         String orderTypeId = (String) context.get("orderTypeId");
         Timestamp upperBoundDate = (Timestamp) context.get("upperBoundDate");
         Timestamp lowerBoundDate = (Timestamp) context.get("lowerBoundDate");
+        String clientTimeZoneId = (String) context.get("timeZoneId");
+        upperBoundDate = convertToTimeZone(upperBoundDate, clientTimeZoneId, TimeZone.getDefault().getID());
+        lowerBoundDate = convertToTimeZone(lowerBoundDate, clientTimeZoneId, TimeZone.getDefault().getID());
+
         List<String> orderStatusIdList = (List<String>) context.get("orderStatusId");
 
         Map<String, Order> orderIdToOrderMap = getOrders(
@@ -77,6 +76,7 @@ public class EasyPosSalesOrderWorker {
                 username,
                 lowerBoundDate,
                 upperBoundDate,
+                clientTimeZoneId,
                 orderStatusIdList);
         /*********************************************/
 
@@ -204,21 +204,12 @@ public class EasyPosSalesOrderWorker {
 
         GenericValue orderHeaderResult = EntityQuery.use(delegator).from("OrderHeader").where("orderId", orderId).cache(false).queryOne();
         Timestamp orderTimestamp = (Timestamp) orderHeaderResult.get("orderDate");
-
-        String[] timeZoneList = request.getParameterMap().get("timeZone");
-        String timeZone = null;
-        if (Objects.nonNull(timeZoneList) && timeZoneList.length > 0) {
-            timeZone = timeZoneList[0];
-        }
-
-        String formattedDateTime;
-        if (Objects.nonNull(timeZone)) {
-            formattedDateTime = orderTimestamp.toLocalDateTime().atZone(ZoneId.of(timeZone)).format(dateTimeFormatter);
-        } else {
-            formattedDateTime = orderTimestamp.toLocalDateTime().format(dateTimeFormatter);
-        }
+        String formattedDateTime = orderTimestamp.toLocalDateTime().format(dateTimeFormatter);
+        String timeZoneId = TimeZone.getDefault().getID();
+        Debug.logInfo("timezoneId: " + timeZoneId, "EasyPosSalesOrderWorker");
 
         request.setAttribute("orderDate", formattedDateTime);
+        request.setAttribute("timeZoneId", timeZoneId);
         request.setAttribute("seqIdMap", productIdToSeqIdMap);
 
         return "success";
@@ -506,6 +497,7 @@ public class EasyPosSalesOrderWorker {
                                                 String createdByUsername,
                                                 Timestamp lowerBoundDate,
                                                 Timestamp upperBoundDate,
+                                                String clientTimeZoneId,
                                                 List<String> orderStatusIdList) throws GenericEntityException {
         String orderHeaderAlias = "OH";
         String orderItemAlias = "OI";
@@ -593,6 +585,7 @@ public class EasyPosSalesOrderWorker {
                 String tableList = orderName.toLowerCase().replace("table", "");
                 order.setTables(Arrays.asList(tableList.split(PRODUCT_LIST_DELIMITER)));
 
+                orderTimeStamp = convertToTimeZone(orderTimeStamp, TimeZone.getDefault().getID(), clientTimeZoneId);
                 LocalDateTime localDate = orderTimeStamp.toLocalDateTime();
                 order.setTimestamp(dateTimeFormatter.format(localDate));
 
@@ -605,6 +598,12 @@ public class EasyPosSalesOrderWorker {
         }
 
         return orderIdToOrderMap;
+    }
+
+    private static Timestamp convertToTimeZone(Timestamp timeStamp, String fromTimeZoneId, String ToTimeZoneId) {
+        ZonedDateTime newDateTime = timeStamp.toLocalDateTime().atZone(ZoneId.of(fromTimeZoneId)).withZoneSameInstant(ZoneId.of(ToTimeZoneId));
+
+        return Timestamp.valueOf(newDateTime.toLocalDateTime());
     }
 
     private static class OrderItem {
@@ -732,4 +731,5 @@ public class EasyPosSalesOrderWorker {
             this.name = name;
         }
     }
+
 }
