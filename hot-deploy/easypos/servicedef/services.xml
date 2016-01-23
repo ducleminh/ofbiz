@@ -210,4 +210,13 @@
         <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
     </service>
 
+    <service name="updateStoreMenu" engine="java"
+             location="org.easypos.catalog.EasyPosCatalogWorker" invoke="updateStoreMenu" auth="true">
+        <description>Add tables To Product Store</description>
+        <attribute type="List" mode="IN" name="addProductIds" optional="false"/>
+        <attribute type="List" mode="IN" name="deleteProductIds" optional="false"/>
+        <attribute type="String" mode="IN" name="catalogId" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+    </service>
+
 </services>

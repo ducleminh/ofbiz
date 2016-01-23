@@ -105,7 +105,7 @@ public class EasyPosSalesOrderWorker {
         conditions.add(orderIdCondition);
         conditions.add(roleTypeIdCondition);
 
-        List<GenericValue> allCustomerOrderResult = EntityQuery.use(delegator).from(dynamicViewEntity).where(EntityCondition.makeCondition(conditions)).cache(true).queryList();
+        List<GenericValue> allCustomerOrderResult = EntityQuery.use(delegator).from(dynamicViewEntity).where(EntityCondition.makeCondition(conditions)).cache(false).queryList();
         for (GenericValue value : allCustomerOrderResult) {
             String orderId = (String) value.get(orderRoleAlias + "orderId");
             String customerFirstName = (String) value.get(partyAndPersonAlias + "firstName");
