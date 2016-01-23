@@ -116,8 +116,7 @@ under the License.
         <#if maxlength?has_content>  maxlength="${maxlength}"</#if>
         <#if id?has_content> id="${id}_i18n"</#if>/><#rt/>
     </#if>
-    <#-- the style attribute is a little bit messy but when using disply:none the timepicker is shown on a wrong place -->
-    <input type="text" <#if tabindex?has_content> tabindex="${tabindex}"</#if> name="${name}" style="height:1px;width:1px;border:none;background-color:transparent" <#if event?has_content && action?has_content> ${event}="${action}"</#if> <@renderClass className alert /><#rt/>
+    <input type="hidden" <#if tabindex?has_content> tabindex="${tabindex}"</#if> name="${name}" <#if event?has_content && action?has_content> ${event}="${action}"</#if> <@renderClass className alert /><#rt/>
       <#if title?has_content> title="${title}"</#if>
       <#if value?has_content> value="${value}"</#if>
       <#if size?has_content> size="${size}"</#if><#rt/>
@@ -869,7 +868,7 @@ Parameter: tabindex, String, optional - HTML tabindex number.
     <#if confirmation?has_content> onclick="return confirm('${confirmation?js_string}')"</#if>>
       <#if imgSrc?has_content><img src="${imgSrc}" alt=""/></#if>${description}</a>
 </#macro>
-<#macro makeHyperlinkString linkStyle hiddenFormName event action imgSrc title alternate linkUrl targetWindow description confirmation uniqueItemName="" height="" width="" id="">
+<#macro makeHyperlinkString linkStyle hiddenFormName event action imgSrc title targetParameters alternate linkUrl targetWindow description confirmation uniqueItemName="" height="" width="" id="">
     <#if uniqueItemName?has_content>
         <div id="${uniqueItemName}"></div>
         <a href="javascript:void(0);" id="${uniqueItemName}_link" 
@@ -877,10 +876,14 @@ Parameter: tabindex, String, optional - HTML tabindex number.
         <#if description?has_content>${description}</#if></a>
         <script type="text/javascript">
             function ${uniqueItemName}_data () {
-                var data =  {
-                    <#--list parameterList as parameter>
-                        "${parameter.name}": "${parameter.value}",
-                    </#list-->
+                var data = {
+                <#if targetParameters?has_content>
+                    <#assign parameterMap = targetParameters?eval>
+                    <#assign parameterKeys = parameterMap?keys>
+                    <#list parameterKeys as key>
+                    "${key}": "${parameterMap[key]}",
+                    </#list>
+                </#if>
                     "presentation": "layer"
                 };
                 return data;
