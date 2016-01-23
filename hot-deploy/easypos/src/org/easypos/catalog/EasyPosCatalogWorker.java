@@ -1,5 +1,6 @@
 package org.easypos.catalog;
 
+import org.apache.commons.lang.StringUtils;
 import org.easypos.category.EasyPosProductTagWorker;
 import org.ofbiz.base.util.Debug;
 import org.ofbiz.base.util.UtilMisc;
@@ -8,11 +9,10 @@ import org.ofbiz.entity.GenericDelegator;
 import org.ofbiz.entity.GenericEntityException;
 import org.ofbiz.entity.GenericValue;
 import org.ofbiz.entity.condition.EntityCondition;
+import org.ofbiz.entity.condition.EntityOperator;
 import org.ofbiz.entity.util.EntityQuery;
 import org.ofbiz.service.*;
 
-import java.io.IOException;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -42,10 +42,27 @@ public class EasyPosCatalogWorker {
 
         Map<String, Object> serviceResult;
         Map<String, Object> paramMap;
+        Map<String, Object> returnedValues;
 
         String catalogId = (String) context.get("catalogId");
         List<String> deleteProductIds = (List<String>) context.get("deleteProductIds");
         List<String> addProductIds = (List<String>) context.get("addProductIds");
+
+        if ( (deleteProductIds == null || deleteProductIds.isEmpty())
+                && (addProductIds == null || addProductIds.isEmpty())
+                && StringUtils.isEmpty(catalogId)) {
+            returnedValues = ServiceUtil.returnSuccess();
+            returnedValues.put("success", false);
+
+            return returnedValues;
+        }
+
+        if (deleteProductIds == null) {
+            deleteProductIds = new ArrayList<>();
+        }
+        if (addProductIds == null) {
+            addProductIds = new ArrayList<>();
+        }
 
         EntityCondition condition1 = EntityCondition.makeCondition("prodCatalogId", catalogId);
         EntityCondition condition2 = EntityCondition.makeCondition("prodCatalogCategoryTypeId", EasyPosProductTagWorker.DEFAULT_PRODUCT_CATALOG_CATEGORY_TYPE);
@@ -57,33 +74,53 @@ public class EasyPosCatalogWorker {
         String categoryId = "";
         if (categoryIdGenericValue != null) {
             categoryId = (String) categoryIdGenericValue.get("productCategoryId");
-        } else {
-            ServiceUtil.returnError("Fail to find the corresponding category id for menu: " + catalogId);
+        }
+        if (StringUtils.isEmpty(categoryId)) {
+            returnedValues = ServiceUtil.returnSuccess();
+            returnedValues.put("success", false);
+
+            return returnedValues;
         }
 
-        for (String idToDelete : deleteProductIds) {
-            EntityCondition timeStampCondition1 = EntityCondition.makeCondition("productCategoryId", categoryId);
-            EntityCondition timeStampCondition2 = EntityCondition.makeCondition("productId", idToDelete);
-            List<EntityCondition> timeStampConditions = new ArrayList<>();
-            timeStampConditions.add(timeStampCondition1);
-            timeStampConditions.add(timeStampCondition2);
-            GenericValue timeStampGenericValue = EntityQuery.use(delegator).from("ProductCategoryMember").where(timeStampConditions).cache(false).queryOne();
+        /*************DELETION***********/
+        EntityCondition timeStampCondition1 = EntityCondition.makeCondition("productCategoryId", categoryId);
+        EntityCondition timeStampCondition2 = EntityCondition.makeCondition("productId", EntityOperator.IN, deleteProductIds);
+        List<EntityCondition> timeStampConditions = new ArrayList<>();
+        timeStampConditions.add(timeStampCondition1);
+        timeStampConditions.add(timeStampCondition2);
+        List<GenericValue> timeStampGenericValues = EntityQuery.use(delegator).from("ProductCategoryMember").where(timeStampConditions).cache(false).queryList();
 
-            Timestamp fromDate = (Timestamp) timeStampGenericValue.get("fromDate");
+        if (timeStampGenericValues != null) {
+            for (GenericValue value : timeStampGenericValues) {
+                paramMap = UtilMisc.toMap(
+                        "productCategoryId", categoryId,
+                        "productId", value.get("productId"),
+                        "fromDate", value.get("fromDate"),
+                        "userLogin", userLoginGenericValue
+                );
 
-            paramMap = UtilMisc.toMap(
-                    "productCategoryId", categoryId,
-                    "productId", idToDelete,
-                    "fromDate", fromDate,
-                    "userLogin", userLoginGenericValue
-            );
-
-            serviceResult = dispatcher.runSync("removeProductFromCategory", paramMap);
-            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
-                return ServiceUtil.returnError("Unable to remove product from category: " + categoryId);
-            } else {
-                Debug.logInfo("Removed " + idToDelete + " from " + categoryId, "EasyPosCatalogWorker");
+                serviceResult = dispatcher.runSync("removeProductFromCategory", paramMap);
+                if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                    return ServiceUtil.returnError("Unable to remove product from category: " + categoryId);
+                } else {
+                    Debug.logInfo("Removed " + value.get("productId") + " from " + categoryId, "EasyPosCatalogWorker");
+                }
             }
+        }
+        ////////////////////////////////////////
+
+        /*************ADDITION***********/
+        timeStampCondition2 = EntityCondition.makeCondition("productId", EntityOperator.IN, addProductIds);
+        timeStampConditions.clear();
+        timeStampConditions.add(timeStampCondition1);
+        timeStampConditions.add(timeStampCondition2);
+        List<GenericValue> genericValues = EntityQuery.use(delegator).from("ProductCategoryMember").where(timeStampConditions).cache(false).queryList();
+
+        for (GenericValue value : genericValues) {
+            String foundId = (String) value.get("productId");
+            addProductIds.remove(foundId);
+
+            Debug.logInfo("Product already exists, NOT adding: " + foundId, "EasyPosCatalogWorker");
         }
 
         for (String idToAdd : addProductIds) {
@@ -101,8 +138,9 @@ public class EasyPosCatalogWorker {
                 Debug.logInfo("Added " + idToAdd + " to " + categoryId, "EasyPosCatalogWorker");
             }
         }
+        ////////////////////////////////////////
 
-        Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
+        returnedValues = ServiceUtil.returnSuccess();
         returnedValues.put("success", true);
 
         return returnedValues;

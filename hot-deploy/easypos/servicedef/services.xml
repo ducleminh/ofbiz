@@ -67,8 +67,21 @@
         <attribute type="String" mode="IN" name="internalName" optional="false"/>
         <attribute type="String" mode="IN" name="currencyUomId" optional="false"/>
         <attribute type="java.math.BigDecimal" mode="IN" name="price" optional="false"/>
-        <attribute type="String" mode="IN" name="productTags" optional="true"/>
+        <attribute type="java.util.List" mode="IN" name="productTags" optional="true"/>
         <attribute type="String" mode="OUT" name="newProductId" optional="true"/>
+    </service>
+
+    <service name="easyPosUpdateProduct" engine="java"
+             location="org.easypos.product.EasyPosProductWorker" invoke="easyPosUpdateProduct">
+        <description>
+            Update product name, or price, or categories
+        </description>
+        <attribute type="String" mode="IN" name="productId" optional="false"/>
+        <attribute type="String" mode="IN" name="internalName" optional="true"/>
+        <attribute type="String" mode="IN" name="price" optional="true"/>
+        <attribute type="java.util.List" mode="IN" name="productTags" optional="true"/>
+        <attribute type="String" mode="IN" name="currencyUomId" optional="true"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="true"/>
     </service>
 
     <service name="getAllProductsPerOwner" engine="java"
@@ -213,8 +226,8 @@
     <service name="updateStoreMenu" engine="java"
              location="org.easypos.catalog.EasyPosCatalogWorker" invoke="updateStoreMenu" auth="true">
         <description>Add tables To Product Store</description>
-        <attribute type="List" mode="IN" name="addProductIds" optional="false"/>
-        <attribute type="List" mode="IN" name="deleteProductIds" optional="false"/>
+        <attribute type="List" mode="IN" name="addProductIds" optional="true"/>
+        <attribute type="List" mode="IN" name="deleteProductIds" optional="true"/>
         <attribute type="String" mode="IN" name="catalogId" optional="false"/>
         <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
     </service>

@@ -1,16 +1,19 @@
 package org.easypos.product;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.easypos.category.EasyPosProductTagWorker;
 import org.easypos.party.EasyPosPartyWorker;
+import org.ofbiz.base.util.Debug;
 import org.ofbiz.base.util.UtilMisc;
-import org.ofbiz.entity.*;
+import org.ofbiz.entity.DelegatorFactory;
+import org.ofbiz.entity.GenericDelegator;
+import org.ofbiz.entity.GenericEntityException;
+import org.ofbiz.entity.GenericValue;
+import org.ofbiz.entity.condition.EntityCondition;
 import org.ofbiz.entity.jdbc.SQLProcessor;
-import org.ofbiz.service.DispatchContext;
-import org.ofbiz.service.GenericServiceException;
-import org.ofbiz.service.LocalDispatcher;
-import org.ofbiz.service.ServiceContainer;
-import org.ofbiz.service.ServiceUtil;
+import org.ofbiz.entity.util.EntityQuery;
+import org.ofbiz.service.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,9 +58,7 @@ public class EasyPosProductWorker {
         String internalProductName = ((String) context.get("internalName")).toUpperCase();
         String currencyUomId = (String) context.get("currencyUomId");
         BigDecimal priceBD = (BigDecimal) context.get("price");
-        String productTagDelimitedList = (String) context.get("productTags");
-
-        List<String> productTagsList = Arrays.asList(productTagDelimitedList.split(PRODUCT_TAG_DELIMITER));
+        List<String> productTags = (List<String>) context.get("productTags");
 
         //Create the product
         Map<String, Object> createNewProductParamMap = UtilMisc.toMap(
@@ -95,19 +96,9 @@ public class EasyPosProductWorker {
         /*********************************************/
 
         //Add product's tags
-        for (String productTag : productTagsList) {
-            Map<String, Object> addProductTagParamMap = UtilMisc.toMap(
-                    "productId", newProductId,
-                    "attrName", productTag.toUpperCase(),
-                    "attrValue", productTag.toUpperCase(),
-                    "attrType", PRODUCT_TAG_ATTR_TYPE,
-                    "userLogin", userLoginGenericValue
-            );
-
-            serviceResult = dispatcher.runSync("createProductAttribute", addProductTagParamMap);
-            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
-                return ServiceUtil.returnError("Unable to add product's tag: " + productTag);
-            }
+        serviceResult = addProductTags(productTags, newProductId, dctx, context);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            return ServiceUtil.returnError("Unable to add tags to product: " + newProductId);
         }
         /*********************************************/
 
@@ -134,6 +125,140 @@ public class EasyPosProductWorker {
         return returnedValues;
     }
 
+    public static Map<String, Object> easyPosUpdateProduct(DispatchContext dctx,
+                                                    Map<String, ? extends Object> context)
+            throws GenericServiceException, GenericEntityException {
+        GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
+        LocalDispatcher dispatcher = ServiceContainer.getLocalDispatcher("default", delegator);
+
+        GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
+
+        Map<String, Object> serviceResult;
+        Map<String, Object> returnedValues;
+
+        //Get all required params
+        String productId = ((String) context.get("productId"));
+        String newProductName = (String) context.get("internalName");
+        String currencyUomId = (String) context.get("currencyUomId");
+        String priceString = (String) context.get("price");
+        List<String> productTags = (List<String>) context.get("productTags");
+
+        if (!StringUtils.isEmpty(newProductName)) {
+            newProductName = newProductName.toUpperCase();
+
+            //update the product name
+            Map<String, Object> updateNameParamMap = UtilMisc.toMap(
+                    "productId", productId,
+                    "internalName", newProductName,
+                    "requireInventory", DEFAULT_REQUIRE_INVENTORY,
+                    "productTypeId", DEFAULT_PRODUCT_TYPE_ID,
+                    "userLogin", userLoginGenericValue
+            );
+
+            serviceResult = dispatcher.runSync("updateProduct", updateNameParamMap);
+
+            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                return ServiceUtil.returnError("Unable to update product name: " + productId);
+            }
+            /*********************************************/
+        }
+
+        BigDecimal priceBD = null;
+        try {
+            priceBD = new BigDecimal(priceString);
+        } catch (NumberFormatException ex) {
+            Debug.logInfo("Failed to parse price: " + priceString, "EasyPosProductWorker");
+        }
+
+        if (priceBD != null && StringUtils.isNotEmpty(currencyUomId)) {
+            List<EntityCondition> getFromDateConditions = new ArrayList<>();
+            getFromDateConditions.add(EntityCondition.makeCondition("productId", productId));
+            getFromDateConditions.add(EntityCondition.makeCondition("productPriceTypeId", DEFAULT_PRODUCT_PRICE_TYPE));
+            getFromDateConditions.add(EntityCondition.makeCondition("productPricePurposeId", DEFAULT_PRODUCT_PRICE_PURPOSE));
+            getFromDateConditions.add(EntityCondition.makeCondition("currencyUomId", currencyUomId));
+            getFromDateConditions.add(EntityCondition.makeCondition("productStoreGroupId", DEFAULT_PRODUCT_STORE_GROUP_ID));
+            GenericValue fromDateGenericValue = EntityQuery.use(delegator).from("ProductPrice").where(getFromDateConditions).cache(false).queryOne();
+
+            //Create the product price
+            Map<String, Object> updatePriceParamMap = UtilMisc.toMap(
+                    "productId", productId,
+                    "productPriceTypeId", DEFAULT_PRODUCT_PRICE_TYPE,
+                    "productPricePurposeId", DEFAULT_PRODUCT_PRICE_PURPOSE,
+                    "currencyUomId", currencyUomId,
+                    "productStoreGroupId", DEFAULT_PRODUCT_STORE_GROUP_ID,
+                    "price", priceBD,
+                    "fromDate", fromDateGenericValue.get("fromDate"),
+                    "userLogin", userLoginGenericValue
+            );
+
+            serviceResult = dispatcher.runSync("updateProductPrice", updatePriceParamMap);
+
+            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                return ServiceUtil.returnError("Unable to update price to product: " + productId);
+            }
+            /*********************************************/
+        }
+
+        if (productTags != null && !productTags.isEmpty()) {
+            // DELETE ALL TAGS first
+            List<GenericValue> tagsGenericValue = EntityQuery.use(delegator).from("ProductAttribute").where("productId", productId).cache(false).queryList();
+            if (tagsGenericValue != null) {
+                for (GenericValue value : tagsGenericValue) {
+                    Map<String, Object> addProductTagParamMap = UtilMisc.toMap(
+                            "productId", productId,
+                            "attrName", value.get("attrName"),
+                            "userLogin", userLoginGenericValue
+                    );
+
+                    serviceResult = dispatcher.runSync("deleteProductAttribute", addProductTagParamMap);
+                    if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                        return ServiceUtil.returnError("Unable to delete product's tag: " + value.get("attrName"));
+                    }
+                }
+            }
+
+            // ADD the NEW ones in
+            serviceResult = addProductTags(productTags, productId, dctx, context);
+            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                return ServiceUtil.returnError("Unable to add tags to product: " + productId);
+            }
+        }
+
+        returnedValues = ServiceUtil.returnSuccess();
+        returnedValues.put("success", true);
+
+        return returnedValues;
+    }
+
+    private static Map<String, Object> addProductTags(List<String> tags,
+                                                      String productId,
+                                                      DispatchContext dctx,
+                                                      Map<String, ? extends Object> context)
+            throws GenericServiceException {
+        GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
+        LocalDispatcher dispatcher = ServiceContainer.getLocalDispatcher("default", delegator);
+
+        GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
+
+
+        for (String productTag : tags) {
+            Map<String, Object> addProductTagParamMap = UtilMisc.toMap(
+                    "productId", productId,
+                    "attrName", productTag.toUpperCase(),
+                    "attrValue", productTag.toUpperCase(),
+                    "attrType", PRODUCT_TAG_ATTR_TYPE,
+                    "userLogin", userLoginGenericValue
+            );
+
+            Map<String, Object> serviceResult = dispatcher.runSync("createProductAttribute", addProductTagParamMap);
+            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                return ServiceUtil.returnError("Unable to add product's tag: " + productTag);
+            }
+        }
+
+        return ServiceUtil.returnSuccess();
+    }
+
     public static Map<String, Object> addMultipleProductsToCategory(DispatchContext dctx, Map<String, ? extends Object> context)
             throws GenericServiceException {
         GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
@@ -141,7 +266,7 @@ public class EasyPosProductWorker {
 
         GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
 
-        Map<String, Object> paramMap = null;
+        Map<String, Object> paramMap;
         Map<String, Object> serviceResult;
         Map<String, Object> returnedValues;
 
