@@ -4,6 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import javolution.util.FastMap;
 import org.easypos.product.EasyPosProductWorker;
+import org.easypos.request.cache.RequestLRUCache;
 import org.easypos.store.EasyPosProductStoreWorker;
 import org.ofbiz.base.util.Debug;
 import org.ofbiz.base.util.UtilMisc;
@@ -211,6 +212,17 @@ public class EasyPosSalesOrderWorker {
         request.setAttribute("orderDate", formattedDateTime);
         request.setAttribute("timeZoneId", timeZoneId);
         request.setAttribute("seqIdMap", productIdToSeqIdMap);
+
+        String[] requestIds = request.getParameterMap().get("requestId");
+        if (requestIds != null && requestIds.length > 0) {
+            Map<String, Object> responseResult = FastMap.newInstance();
+            responseResult.put("orderDate", formattedDateTime);
+            responseResult.put("timeZoneId", timeZoneId);
+            responseResult.put("seqIdMap", productIdToSeqIdMap);
+            responseResult.put("orderId", orderId);
+
+            RequestLRUCache.INSTANCE.put(RequestLRUCache.generateRequestId(request.getParameter("userLoginId"), requestIds[0]), responseResult);
+        }
 
         return "success";
     }

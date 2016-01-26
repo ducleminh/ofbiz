@@ -232,4 +232,11 @@
         <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
     </service>
 
+    <service name="easyPOSCheckRequestStatus" engine="java"
+             location="org.easypos.request.EasyPosRequestStatusWorker" invoke="easyPOSCheckRequestStatus" auth="true">
+        <description>check if a request has successfully finished</description>
+        <attribute type="String" mode="IN" name="requestId" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="requestSuccess" optional="false"/>
+    </service>
+
 </services>
