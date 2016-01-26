@@ -439,6 +439,11 @@ public class EasyPosSalesOrderWorker {
         String orderId = (String) context.get("orderId");
         List<String> productAndQuantityList = (List<String>) context.get("productAndQuantity");
 
+        String facilityId = (String) context.get("facilityId");
+        String inventoryItemTypeId = (String) context.get("inventoryItemTypeId");
+        String quantityRejected = (String) context.get("quantityRejected");
+        String unitCost = (String) context.get("unitCost");
+
         Map<String, Object> serviceResult;
         Map<String, Object> paramMap;
         List<OrderItem> orderItemList = new ArrayList<>();
@@ -482,6 +487,24 @@ public class EasyPosSalesOrderWorker {
 
 
         }
+        /*********************************************/
+        paramMap = UtilMisc.toMap(
+                "facilityId", facilityId,
+                "inventoryItemTypeId", inventoryItemTypeId,
+                "quantityRejected", quantityRejected,
+                "unitCost", unitCost,
+                "productAndQuantity", productAndQuantityList,
+                "userLogin", userLoginGenericValue
+        );
+
+        serviceResult = dispatcher.runSync("createInventoryItems", paramMap);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            return ServiceUtil.returnError("Unable create inventory items for newly created items");
+        }
+        //-----------------------------------------------------
+        // create inventory items for the newly added product
+
+
         /*********************************************/
 
         Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
