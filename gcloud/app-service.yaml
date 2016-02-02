@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: ofbizservice
+  name: ofbizservice
+spec:
+  type: LoadBalancer
+  ports:
+    # The port that this service should serve on.
+    - port: 8443
+      targetPort: 8443
+      protocol: TCP
+  # Label keys and values that must match in order to receive traffic for this service.
+  selector:
+    name: ofbiz
