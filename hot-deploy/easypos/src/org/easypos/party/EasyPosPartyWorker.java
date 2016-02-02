@@ -10,6 +10,8 @@ import org.ofbiz.service.ServiceUtil;
 public class EasyPosPartyWorker {
 
     public static final String OWNER_ROLE_TYPE_ID = "OWNER";
+    public static final String EMPLOYEE_ROLE_TYPE_ID = "EMPLOYEE";
+    public static final String MANAGER_ROLE_TYPE_ID = "MANAGER";
 
     public static String getOwnerPartyId(GenericDelegator delegator, String ownerLoginId) throws GenericEntityException {
         GenericValue queryResult = EntityQuery.use(delegator).from("PartyAndUserLoginAndPerson").where("userLoginId", ownerLoginId).cache(true).queryOne();

@@ -38,6 +38,7 @@ public class EasyPosProductStoreWorker {
     private static final String GET_DEFAULT_FACILITY_PER_OWNER_SQL= "./hot-deploy/easypos/sql/GetDefaultFacilityPerOwner.sql";
 
     public static final String CUSTOMER_ROLE_TYPE_ID = "CUSTOMER";
+    public static final String CONTACT_MECH_TYPE_ID = "POSTAL_ADDRESS";
 
     public static Map<String, Object> createNewCompleteStore(DispatchContext dctx,
                                                                        Map<String, ? extends Object> context)
@@ -283,13 +284,36 @@ public class EasyPosProductStoreWorker {
         GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
 
         GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
-        String username = (String) userLoginGenericValue.get("userLoginId");
-        String partyId = (String) userLoginGenericValue.get("partyId");
+        String ownerPartyId = (String) userLoginGenericValue.get("partyId");
 
-        GenericValue queryResult = EntityQuery.use(delegator).from("PartyAndContactMech").where("partyId", partyId).cache(true).queryOne();
-        String contactMechId = (String) queryResult.get("contactMechId");
+
+        List<EntityCondition> queryConditions = new ArrayList<>();
+        queryConditions.add(EntityCondition.makeCondition("partyId", ownerPartyId));
+        queryConditions.add(EntityCondition.makeCondition("contactMechTypeId", CONTACT_MECH_TYPE_ID));
+        GenericValue queryResult = EntityQuery.use(delegator).from("PartyAndContactMech").where(queryConditions).cache(true).queryFirst();
+        String contactMechId = "";
+        if (queryResult !=null) {
+            contactMechId = (String) queryResult.get("contactMechId");
+        }
         Debug.log("Retrieve contactMechId: " + contactMechId);
 
+        queryConditions.clear();
+        queryConditions.add(EntityCondition.makeCondition("partyId", ownerPartyId));
+        queryConditions.add(EntityCondition.makeCondition("roleTypeId", EasyPosPartyWorker.EMPLOYEE_ROLE_TYPE_ID));
+        long queryCount = EntityQuery.use(delegator).from("PartyRole").where(queryConditions).cache(true).queryCount();
+        if (queryCount > 0) {
+            // this is an employee, retrieve owner to get list of stores
+            queryConditions.clear();
+            queryConditions.add(EntityCondition.makeCondition("partyIdTo", ownerPartyId));
+            queryConditions.add(EntityCondition.makeCondition("roleTypeIdFrom", EasyPosPartyWorker.MANAGER_ROLE_TYPE_ID));
+            queryConditions.add(EntityCondition.makeCondition("roleTypeIdTo", EasyPosPartyWorker.EMPLOYEE_ROLE_TYPE_ID));
+            queryResult = EntityQuery.use(delegator).from("PartyRelationship").where(queryConditions).cache(true).queryFirst();
+            if (queryResult != null) {
+                ownerPartyId = (String) queryResult.get("partyIdFrom");
+            }
+        }
+
+        Debug.logInfo("ownerPartyId: " + ownerPartyId, "getAllStoresPerOwner");
         SQLProcessor sqlProcessor = new SQLProcessor(delegator, delegator.getGroupHelperInfo("org.ofbiz"));
 
         //-----------------------------------------------------
@@ -297,7 +321,7 @@ public class EasyPosProductStoreWorker {
         String sql = FileUtils.readFileToString(new File(GET_STORENAME_PER_OWNER_SQL) );
         sqlProcessor.prepareStatement(sql);
         PreparedStatement preparedStatement = sqlProcessor.getPreparedStatement();
-        preparedStatement.setString(1, username);
+        preparedStatement.setString(1, ownerPartyId);
         preparedStatement.setString(2, EasyPosPartyWorker.OWNER_ROLE_TYPE_ID);
 
         Map<String, Store> storeIdToStoreMap = new HashMap<>();
@@ -409,7 +433,7 @@ public class EasyPosProductStoreWorker {
         sqlProcessor.prepareStatement(sql);
         preparedStatement = sqlProcessor.getPreparedStatement();
         preparedStatement.setString(1, EasyPosPartyWorker.OWNER_ROLE_TYPE_ID);
-        preparedStatement.setString(2, partyId);
+        preparedStatement.setString(2, ownerPartyId);
 
         rs = sqlProcessor.executeQuery();
         Facility facility = new Facility();
@@ -427,7 +451,7 @@ public class EasyPosProductStoreWorker {
 
         Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
         returnedValues.put("stores", allStores);
-        returnedValues.put("partyId", partyId);
+        returnedValues.put("partyId", ownerPartyId);
         returnedValues.put("contactMechId", contactMechId);
         returnedValues.put("defaultFacility", facilities);
 

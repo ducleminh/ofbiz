@@ -488,6 +488,8 @@ public class EasyPosSalesOrderWorker {
 
         }
         /*********************************************/
+
+        // create inventory items for the newly added product
         paramMap = UtilMisc.toMap(
                 "facilityId", facilityId,
                 "inventoryItemTypeId", inventoryItemTypeId,
@@ -501,9 +503,6 @@ public class EasyPosSalesOrderWorker {
         if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
             return ServiceUtil.returnError("Unable create inventory items for newly created items");
         }
-        //-----------------------------------------------------
-        // create inventory items for the newly added product
-
 
         /*********************************************/
 

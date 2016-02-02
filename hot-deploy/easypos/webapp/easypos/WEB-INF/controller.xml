@@ -179,6 +179,13 @@
         <response name="success" type="request" value="json"></response>
         <response name="error" type="request" value="json"></response>
     </request-map>
+
+    <request-map uri="easyPOSGetUserAppPermission">
+        <security auth="true" https="true"/>
+        <event type="service" invoke="easyPOSGetUserAppPermission"></event>
+        <response name="success" type="request" value="json"></response>
+        <response name="error" type="request" value="json"></response>
+    </request-map>
     
     <!-- View Mappings -->
     <view-map name="main" type="screen" page="component://easypos/widget/EasyPOSScreens.xml#main"/>

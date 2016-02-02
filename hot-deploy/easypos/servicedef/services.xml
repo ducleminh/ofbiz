@@ -239,4 +239,12 @@
         <attribute type="Boolean" mode="OUT" name="requestSuccess" optional="false"/>
     </service>
 
+    <service name="easyPOSGetUserAppPermission" engine="java"
+             location="org.easypos.user.permission.EasyPosPermissionWorker" invoke="easyPOSGetUserAppPermission" auth="true">
+        <description>Retrieve list of user permissions</description>
+        <attribute type="List" mode="OUT" name="permissions" optional="true"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="isOwner" optional="false"/>
+    </service>
+
 </services>
