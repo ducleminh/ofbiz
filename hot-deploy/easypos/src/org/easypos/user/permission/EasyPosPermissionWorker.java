@@ -45,8 +45,8 @@ public class EasyPosPermissionWorker {
 
         List<EntityCondition> conditions = new ArrayList<>();
         conditions.add(EntityCondition.makeCondition(userAndSecurityAlias + "userLoginId", userLoginId));
-        conditions.add(EntityCondition.makeCondition(userAndSecurityAlias + "enabled", "Y"));
-        conditions.add(EntityCondition.makeCondition(securityPermissionAlias + "permissionId", EntityOperator.LIKE, "EASYPOS_APP" + "%"));
+        //conditions.add(EntityCondition.makeCondition(userAndSecurityAlias + "enabled", "Y"));
+        conditions.add(EntityCondition.makeCondition(securityPermissionAlias + "permissionId", EntityOperator.LIKE, EASYPOS_APP_PERMISSION_PREFIX + "%"));
 
         List<GenericValue> queryResult = EntityQuery.use(delegator).from(dynamicViewEntity).where(conditions).cache(false).queryList();
         Set<String> permissions = new HashSet<>();
@@ -57,7 +57,7 @@ public class EasyPosPermissionWorker {
         conditions.clear();
         conditions.add(EntityCondition.makeCondition("partyId", userPartyId));
         conditions.add(EntityCondition.makeCondition("roleTypeId", EasyPosPartyWorker.OWNER_ROLE_TYPE_ID));
-        long ownerQueryCount = EntityQuery.use(delegator).from("PartyRole").where(conditions).cache(true).queryCount();
+        long ownerQueryCount = EntityQuery.use(delegator).from("PartyRole").where(conditions).cache(false).queryCount();
 
         Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
         returnedValues.put("permissions", Lists.newArrayList(permissions));

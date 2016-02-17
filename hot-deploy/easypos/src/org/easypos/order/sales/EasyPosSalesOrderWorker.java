@@ -70,11 +70,34 @@ public class EasyPosSalesOrderWorker {
 
         List<String> orderStatusIdList = (List<String>) context.get("orderStatusId");
 
+        //////////////////////////////////////////////////////////
+        //Get all owner, manager and employee login of this product store
+        String productStoreRoleAlias = "ProductStoreRole";
+        String userLoginAlias = "PartyAndUserLogin";
+        DynamicViewEntity dynamicViewEntity = new DynamicViewEntity();
+
+        dynamicViewEntity.addMemberEntity(productStoreRoleAlias, "ProductStoreRole");
+        dynamicViewEntity.addMemberEntity(userLoginAlias, "PartyAndUserLogin");
+        dynamicViewEntity.addAlias(productStoreRoleAlias, productStoreRoleAlias + "productStoreId", "productStoreId", null, null, null, null);
+        dynamicViewEntity.addAlias(productStoreRoleAlias, productStoreRoleAlias + "partyId", "partyId", null, null, null, null);
+        dynamicViewEntity.addAlias(userLoginAlias, userLoginAlias + "userLoginId", "userLoginId", null, null, null, null);
+
+        dynamicViewEntity.addViewLink(userLoginAlias, productStoreRoleAlias, Boolean.TRUE, ModelKeyMap.makeKeyMapList("partyId"));
+
+        List<GenericValue> allCreatedByUsernamesResult = EntityQuery.use(delegator).from(dynamicViewEntity).where(productStoreRoleAlias + "productStoreId", productStoreId).cache(false).queryList();
+        Set<String> allStoreEmployeeSet = new HashSet<>();
+        for (GenericValue value : allCreatedByUsernamesResult) {
+            if (value != null) {
+                allStoreEmployeeSet.add((String) value.get(userLoginAlias + "userLoginId"));
+            }
+        }
+        /*******************************************************/
+
         Map<String, Order> orderIdToOrderMap = getOrders(
                 delegator,
                 orderTypeId,
                 productStoreId,
-                username,
+                allStoreEmployeeSet,
                 lowerBoundDate,
                 upperBoundDate,
                 clientTimeZoneId,
@@ -87,7 +110,7 @@ public class EasyPosSalesOrderWorker {
         String partyAndPersonAlias = "PAP";
         String orderRoleAlias = "ORDERROLE";
 
-        DynamicViewEntity dynamicViewEntity = new DynamicViewEntity();
+        dynamicViewEntity = new DynamicViewEntity();
 
         dynamicViewEntity.addMemberEntity(partyAndPersonAlias, "PartyAndPerson");
         dynamicViewEntity.addMemberEntity(orderRoleAlias, "OrderRole");
@@ -528,7 +551,7 @@ public class EasyPosSalesOrderWorker {
     private static Map<String, Order> getOrders(GenericDelegator delegator,
                                                 String orderTypeId,
                                                 String productStoreId,
-                                                String createdByUsername,
+                                                Collection<String> createdByUsernames,
                                                 Timestamp lowerBoundDate,
                                                 Timestamp upperBoundDate,
                                                 String clientTimeZoneId,
@@ -565,7 +588,7 @@ public class EasyPosSalesOrderWorker {
 
         EntityCondition orderTypeCondition = EntityCondition.makeCondition(orderHeaderAlias + "orderTypeId", orderTypeId);
         EntityCondition productStoreCondition = EntityCondition.makeCondition(orderHeaderAlias + "productStoreId", productStoreId);
-        EntityCondition createdByCondition = EntityCondition.makeCondition(orderHeaderAlias + "createdBy", createdByUsername);
+        EntityCondition createdByCondition = EntityCondition.makeCondition(orderHeaderAlias + "createdBy", EntityOperator.IN, createdByUsernames);
         EntityCondition orderItemStatusNotCancelledCondition = EntityCondition.makeCondition(orderHeaderAlias + "statusId", EntityOperator.NOT_EQUAL, ORDER_ITEM_CANCELLED_STATUS);
         EntityCondition orderHeaderStatusCondition = EntityCondition.makeCondition(orderHeaderAlias + "statusId", EntityOperator.IN, orderStatusIdList);
         EntityCondition orderHeaderDateLowerBoundCondition = EntityCondition.makeCondition(orderHeaderAlias + "orderDate", EntityOperator.GREATER_THAN_EQUAL_TO, lowerBoundDate);
@@ -595,6 +618,7 @@ public class EasyPosSalesOrderWorker {
             BigDecimal productPrice = (BigDecimal) result.get(productPriceAlias + "price");
             String currency = (String) result.get(productPriceAlias + "currencyUomId");
             BigDecimal quantity = (BigDecimal) result.get(orderItemAlias + "quantity");
+            String createdBy = (String) result.get(orderHeaderAlias + "createdBy");
 
             OrderItem item = new OrderItem();
             item.setItemStatus(orderItemStatusId);
@@ -615,6 +639,7 @@ public class EasyPosSalesOrderWorker {
                 Order order = new Order();
                 order.setId(orderId);
                 order.setOrderStatus(orderStatusId);
+                order.setCreatedByLoginId(createdBy);
 
                 String tableList = orderName.toLowerCase().replace("table", "");
                 order.setTables(Arrays.asList(tableList.split(PRODUCT_LIST_DELIMITER)));
@@ -695,6 +720,15 @@ public class EasyPosSalesOrderWorker {
         private Customer customer;
         private String timestamp;
         private List<OrderItem> orderItems;
+        private String createdByLoginId;
+
+        public String getCreatedByLoginId() {
+            return createdByLoginId;
+        }
+
+        public void setCreatedByLoginId(String createdByLoginId) {
+            this.createdByLoginId = createdByLoginId;
+        }
 
         public List<OrderItem> getOrderItems() {
             return orderItems;
