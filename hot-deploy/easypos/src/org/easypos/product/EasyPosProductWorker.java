@@ -26,7 +26,7 @@ import java.util.*;
 
 public class EasyPosProductWorker {
 
-    private static final String DEFAULT_PRODUCT_TYPE_ID = "FINISHED_GOOD";
+    private static final String FINISHED_GOOD_PRODUCT_TYPE_ID = "FINISHED_GOOD";
     private static final String DEFAULT_REQUIRE_INVENTORY = "N";
 
     public static final String DEFAULT_PRODUCT_PRICE_TYPE = "DEFAULT_PRICE";
@@ -52,11 +52,13 @@ public class EasyPosProductWorker {
 
         Map<String, Object> serviceResult;
         Map<String, Object> returnedValues;
-        String newProductId = null;
+        String newProductId;
 
         //Get all required params
         String internalProductName = ((String) context.get("internalName")).toUpperCase();
         String currencyUomId = (String) context.get("currencyUomId");
+        String productTypeId = (String) context.get("productTypeId");
+        String termUomId = (String) context.get("termUomId");
         BigDecimal priceBD = (BigDecimal) context.get("price");
         List<String> productTags = (List<String>) context.get("productTags");
 
@@ -64,7 +66,7 @@ public class EasyPosProductWorker {
         Map<String, Object> createNewProductParamMap = UtilMisc.toMap(
                 "internalName", internalProductName,
                 "requireInventory", DEFAULT_REQUIRE_INVENTORY,
-                "productTypeId", DEFAULT_PRODUCT_TYPE_ID,
+                "productTypeId", productTypeId,
                 "userLogin", userLoginGenericValue
         );
 
@@ -85,6 +87,7 @@ public class EasyPosProductWorker {
                 "productStoreGroupId", DEFAULT_PRODUCT_STORE_GROUP_ID,
                 "taxInPrice", DEFAULT_PRICE_WITH_TAX_INCLUDED,
                 "price", priceBD,
+                "termUomId", termUomId,
                 "userLogin", userLoginGenericValue
         );
 
@@ -141,6 +144,8 @@ public class EasyPosProductWorker {
         String newProductName = (String) context.get("internalName");
         String currencyUomId = (String) context.get("currencyUomId");
         String priceString = (String) context.get("price");
+        String productTypeId = (String) context.get("productTypeId");
+        String termUomId = (String) context.get("termUomId");
         List<String> productTags = (List<String>) context.get("productTags");
 
         if (!StringUtils.isEmpty(newProductName)) {
@@ -151,7 +156,7 @@ public class EasyPosProductWorker {
                     "productId", productId,
                     "internalName", newProductName,
                     "requireInventory", DEFAULT_REQUIRE_INVENTORY,
-                    "productTypeId", DEFAULT_PRODUCT_TYPE_ID,
+                    "productTypeId", productTypeId,
                     "userLogin", userLoginGenericValue
             );
 
@@ -187,6 +192,7 @@ public class EasyPosProductWorker {
                     "currencyUomId", currencyUomId,
                     "productStoreGroupId", DEFAULT_PRODUCT_STORE_GROUP_ID,
                     "price", priceBD,
+                    "termUomId", termUomId,
                     "fromDate", fromDateGenericValue.get("fromDate"),
                     "userLogin", userLoginGenericValue
             );
@@ -306,6 +312,7 @@ public class EasyPosProductWorker {
 
         GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
         String username = (String) userLoginGenericValue.get("userLoginId");
+        String productTypeId = (String) context.get("productTypeId");
 
         Map<String, Object> returnedValues;
 
@@ -318,9 +325,10 @@ public class EasyPosProductWorker {
         preparedStatement.setString(3, DEFAULT_PRODUCT_PRICE_TYPE);
         preparedStatement.setString(4, DEFAULT_PRODUCT_PRICE_PURPOSE);
         preparedStatement.setString(5, PRODUCT_TAG_ATTR_TYPE);
+        preparedStatement.setString(6, productTypeId);
 
         ResultSet rs = sqlProcessor.executeQuery();
-        Collection<Product> productCollection = getProductsFromResultSet(rs);
+        Collection<Product> productCollection = getProductsFromResultSet(rs, productTypeId);
 
         List<Product> returnedProducts = new ArrayList<>();
         returnedProducts.addAll(productCollection);
@@ -335,9 +343,6 @@ public class EasyPosProductWorker {
                                                              Map<String, ? extends Object> context)
             throws IOException, GenericEntityException, SQLException {
         GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
-
-        GenericValue userLoginGenericValue = (GenericValue) context.get("userLogin");
-        String username = (String) userLoginGenericValue.get("userLoginId");
 
         String storeId = (String) context.get("storeId");
         String menuId = (String) context.get("menuId");
@@ -356,7 +361,7 @@ public class EasyPosProductWorker {
         preparedStatement.setString(6, PRODUCT_TAG_ATTR_TYPE);
 
         ResultSet rs = sqlProcessor.executeQuery();
-        Collection<Product> productCollection = getProductsFromResultSet(rs);
+        Collection<Product> productCollection = getProductsFromResultSet(rs, FINISHED_GOOD_PRODUCT_TYPE_ID);
 
         List<Product> returnedProducts = new ArrayList<>();
         returnedProducts.addAll(productCollection);
@@ -367,13 +372,16 @@ public class EasyPosProductWorker {
         return returnedValues;
     }
 
-    private static Collection<Product> getProductsFromResultSet(ResultSet rs) throws SQLException {
+    private static Collection<Product> getProductsFromResultSet(ResultSet rs, String productTypeId) throws SQLException {
         Map<String, Product> idToProductMap = new HashMap<>();
         while (rs.next()) {
             String productName = (rs.getString("product_name")).toUpperCase();
             String productId = rs.getString("product_id");
             BigDecimal productPrice = rs.getBigDecimal("price");
             String currency = rs.getString("currency_uom_id");
+            String uomId = rs.getString("uomId");
+            String uomTypeId = rs.getString("uomTypeId");
+            String abbreviation = rs.getString("abbreviation");
             String tagName = rs.getString("tag_name");
             if (tagName != null) {
                 tagName = tagName.toUpperCase();
@@ -390,6 +398,13 @@ public class EasyPosProductWorker {
                 product.setId(productId);
                 product.setCurrencySymbol(currency);
                 product.setPrice(productPrice.floatValue());
+                product.setProductTypeId(productTypeId);
+
+                EasyPosRawMaterialWorker.Uom priceUom = new EasyPosRawMaterialWorker.Uom();
+                priceUom.setId(uomId);
+                priceUom.setType(uomTypeId);
+                priceUom.setAbbr(abbreviation);
+                product.setUom(priceUom);
 
                 tags = new HashSet<>();
                 tags.add(tagName);
@@ -408,6 +423,24 @@ public class EasyPosProductWorker {
         private String currencySymbol;
         private Set<String> tags;
         private String id;
+        private String productTypeId;
+        private EasyPosRawMaterialWorker.Uom uom;
+
+        public EasyPosRawMaterialWorker.Uom getUom() {
+            return uom;
+        }
+
+        public void setUom(EasyPosRawMaterialWorker.Uom uom) {
+            this.uom = uom;
+        }
+
+        public String getProductTypeId() {
+            return productTypeId;
+        }
+
+        public void setProductTypeId(String productTypeId) {
+            this.productTypeId = productTypeId;
+        }
 
         public String getName() {
             return name;

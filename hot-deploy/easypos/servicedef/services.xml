@@ -59,11 +59,21 @@
         <attribute type="java.util.List" mode="OUT" name="tags" optional="false"/>
     </service>
 
+    <service name="easyPOSGetAvailableUom" engine="java"
+             location="org.easypos.product.EasyPosRawMaterialWorker" invoke="getAvailableUom">
+        <description>
+            Returns list of available UOM
+        </description>
+        <attribute type="java.util.List" mode="OUT" name="uomList" optional="false"/>
+    </service>
+
     <service name="addNewProduct" engine="java"
              location="org.easypos.product.EasyPosProductWorker" invoke="addNewProduct">
         <description>
             Add new product with price, multiple categories, and an owner
         </description>
+        <attribute type="String" mode="IN" name="termUomId" optional="true"/>
+        <attribute type="String" mode="IN" name="productTypeId" optional="true"/>
         <attribute type="String" mode="IN" name="internalName" optional="false"/>
         <attribute type="String" mode="IN" name="currencyUomId" optional="false"/>
         <attribute type="java.math.BigDecimal" mode="IN" name="price" optional="false"/>
@@ -76,6 +86,8 @@
         <description>
             Update product name, or price, or categories
         </description>
+        <attribute type="String" mode="IN" name="termUomId" optional="true"/>
+        <attribute type="String" mode="IN" name="productTypeId" optional="true"/>
         <attribute type="String" mode="IN" name="productId" optional="false"/>
         <attribute type="String" mode="IN" name="internalName" optional="true"/>
         <attribute type="String" mode="IN" name="price" optional="true"/>
@@ -89,6 +101,7 @@
         <description>
             Retrive all products per owner
         </description>
+        <attribute type="String" mode="IN" name="productTypeId" optional="false"/>
         <attribute type="java.util.List" mode="OUT" name="products" optional="false"/>
     </service>
 
