@@ -3,6 +3,7 @@ package org.easypos.order.sales;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import javolution.util.FastMap;
+import org.apache.commons.lang.StringUtils;
 import org.easypos.product.EasyPosProductWorker;
 import org.easypos.request.cache.RequestLRUCache;
 import org.easypos.store.EasyPosProductStoreWorker;
@@ -168,8 +169,126 @@ public class EasyPosSalesOrderWorker {
         return returnedValues;
     }
 
+    public static String createAndCompleteEasyPosSalesOrder(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, GenericEntityException, GenericServiceException {
+        GenericValue userLoginGenericValue = (GenericValue) request.getSession().getAttribute("userLogin");
+        GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
+        LocalDispatcher dispatcher = ServiceContainer.getLocalDispatcher("default", delegator);
+
+        String invoicePerShipment = request.getParameter("invoicePerShipment");
+        String setItemStatus = request.getParameter("setItemStatus");
+        String facilityId = request.getParameter("facilityId");
+        String inventoryItemTypeId = request.getParameter("inventoryItemTypeId");
+        String quantityRejected = request.getParameter("quantityRejected");
+        String unitCost = request.getParameter("unitCost");
+        String paymentPartyId = request.getParameter("paymentPartyId");
+
+        String customerId = request.getParameter("customerId");
+        String customerFirstName = request.getParameter("USER_FIRST_NAME");
+        String customerLastName = request.getParameter("USER_LAST_NAME");
+        String productStoreId = request.getParameter("PRODUCT_STORE_ID");
+        String requireEmail = request.getParameter("require_email");
+        String requirePhone = request.getParameter("require_phone");
+        String requireLogin = request.getParameter("require_login");
+        String roleTypeId = request.getParameter("roleTypeId");
+        String useAddress = request.getParameter("USE_ADDRESS");
+        String userEmail = request.getParameter("USER_EMAIL");
+
+        String quickCompleteString = request.getParameter("quickComplete");
+        List<String> productAndQuantity = Arrays.asList(request.getParameterMap().get("productAndQuantity"));
+
+        Map<String, Object> paramMap;
+        Map<String, Object> serviceResult;
+
+        //Create new customer if required
+        if (StringUtils.isBlank(customerId)) {
+            Debug.logInfo("New sales order: creating a new customer", "createAndCompleteEasyPosSalesOrder");
+
+            paramMap = UtilMisc.toMap(
+                    "PRODUCT_STORE_ID", productStoreId,
+                    "USER_FIRST_NAME", customerFirstName,
+                    "USER_LAST_NAME", customerLastName,
+                    "require_email", requireEmail,
+                    "require_phone", requirePhone,
+                    "require_login", requireLogin,
+                    "roleTypeId", roleTypeId,
+                    "USE_ADDRESS", useAddress,
+                    "USER_EMAIL", userEmail,
+                    "userLogin", userLoginGenericValue
+            );
+            serviceResult = dispatcher.runSync("easyPOSCreateNewCustomer", paramMap);
+            if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+                throw new GenericServiceException("Unable to create new customer");
+            }
+
+            customerId = (String) request.getAttribute("partyId");
+        }
+
+        request.setAttribute("partyId", customerId);
+        /***************************************************/
+
+        //Create new sales order
+        String result = createNewEasyPosSalesOrder(request, response);
+        if (Objects.equals(ResponseConstants.RESPONSE_ERROR, result)) {
+            return ResponseConstants.RESPONSE_ERROR;
+        }
+        String orderId = (String) request.getAttribute("orderId");
+        /***************************************************/
+
+        boolean quickComplete = false;
+        if (StringUtils.isNotBlank(quickCompleteString)) {
+            quickComplete = Boolean.valueOf(quickCompleteString);
+        }
+        if (!quickComplete) {
+            Debug.logInfo("We don't quick complete sales order, return.", "createAndCompleteEasyPosSalesOrder");
+            return ResponseConstants.RESPONSE_SUCCESS;
+        }
+
+        //Create the payment for order
+        request.setAttribute("partyId", paymentPartyId);
+        result = receiveOfflinePaymentForSalesOrder(request, response);
+        if (Objects.equals(ResponseConstants.RESPONSE_ERROR, result)) {
+            return ResponseConstants.RESPONSE_ERROR;
+        }
+
+        response.addHeader("success", "false");
+        /***************************************************/
+
+        //Now create the invetory items
+        paramMap = UtilMisc.toMap(
+                "facilityId", facilityId,
+                "productAndQuantity", productAndQuantity,
+                "inventoryItemTypeId", inventoryItemTypeId,
+                "quantityRejected", quantityRejected,
+                "unitCost", unitCost,
+                "userLogin", userLoginGenericValue
+        );
+        serviceResult = dispatcher.runSync("createInventoryItems", paramMap);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            throw new GenericServiceException("Unable to create inventory items");
+        }
+        /***************************************************/
+
+        //create success, now complete the order
+        paramMap = UtilMisc.toMap(
+                "orderId", orderId,
+                "invoicePerShipment", invoicePerShipment,
+                "facilityId", facilityId,
+                "setItemStatus", setItemStatus,
+                "userLogin", userLoginGenericValue
+        );
+        /***************************************************/
+
+        serviceResult = dispatcher.runSync("completeSalesOrder", paramMap);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            throw new GenericServiceException("Unable to complete sales order");
+        }
+
+        return ResponseConstants.RESPONSE_SUCCESS;
+    }
+
     public static String createNewEasyPosSalesOrder(HttpServletRequest request, HttpServletResponse response)
-            throws IOException, GenericEntityException {
+            throws IOException, GenericEntityException, GenericServiceException {
 
         String javaEventResult = ShoppingCartEvents.destroyCart(request, response);
         if (Objects.equals(ResponseConstants.RESPONSE_ERROR, javaEventResult)) {
@@ -247,7 +366,7 @@ public class EasyPosSalesOrderWorker {
             RequestLRUCache.INSTANCE.put(RequestLRUCache.generateRequestId(request.getParameter("userLoginId"), requestIds[0]), responseResult);
         }
 
-        return "success";
+        return ResponseConstants.RESPONSE_SUCCESS;
     }
 
     public static Map<String, Object> cancelSalesOrder(DispatchContext dctx,
@@ -445,7 +564,6 @@ public class EasyPosSalesOrderWorker {
         }
 
         response.addHeader("success", "true");
-
         request.setAttribute("test", "test");
 
         return "success";
@@ -531,6 +649,7 @@ public class EasyPosSalesOrderWorker {
 
         Map<String, Object> returnedValues = ServiceUtil.returnSuccess();
         returnedValues.put("orderItems", orderItemList);
+        returnedValues.put("success", true);
 
         return returnedValues;
     }

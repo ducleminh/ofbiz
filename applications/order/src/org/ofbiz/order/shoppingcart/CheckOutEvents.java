@@ -18,26 +18,7 @@
  *******************************************************************************/
 package org.ofbiz.order.shoppingcart;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
-import org.ofbiz.base.util.Debug;
-import org.ofbiz.base.util.GeneralException;
-import org.ofbiz.base.util.GeneralRuntimeException;
-import org.ofbiz.base.util.UtilDateTime;
-import org.ofbiz.base.util.UtilGenerics;
-import org.ofbiz.base.util.UtilHttp;
-import org.ofbiz.base.util.UtilMisc;
-import org.ofbiz.base.util.UtilProperties;
-import org.ofbiz.base.util.UtilValidate;
+import org.ofbiz.base.util.*;
 import org.ofbiz.entity.Delegator;
 import org.ofbiz.entity.GenericEntityException;
 import org.ofbiz.entity.GenericValue;
@@ -52,6 +33,12 @@ import org.ofbiz.service.ModelService;
 import org.ofbiz.service.ServiceUtil;
 import org.ofbiz.webapp.stats.VisitHandler;
 import org.ofbiz.webapp.website.WebSiteWorker;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.math.BigDecimal;
+import java.util.*;
 
 /**
  * Events used for processing checkout and orders.
@@ -445,8 +432,18 @@ public class CheckOutEvents {
         String affiliateId = (String) session.getAttribute("_AFFILIATE_ID_");
         String visitId = VisitHandler.getVisitId(session);
         String webSiteId = WebSiteWorker.getWebSiteId(request);
+        String orderDateTimeOffsetObject = request.getParameter("orderDateTimeOffset");
+        long orderDateTimeOffset = 0;
+        if (UtilValidate.isNotEmpty(orderDateTimeOffset)) {
+            try {
+                orderDateTimeOffset = Long.valueOf(orderDateTimeOffsetObject);
+            } catch (NumberFormatException ex) {
+                Debug.logInfo("Fail to parse orderDateTimeOffset: " + orderDateTimeOffsetObject, "CheckOutEvents");
+                orderDateTimeOffset = 0;
+            }
+        }
 
-        callResult = checkOutHelper.createOrder(userLogin, distributorId, affiliateId, trackingCodeOrders, areOrderItemsExploded, visitId, webSiteId);
+        callResult = checkOutHelper.createOrder(userLogin, distributorId, affiliateId, trackingCodeOrders, areOrderItemsExploded, visitId, webSiteId, orderDateTimeOffset);
         if (callResult != null) {
             ServiceUtil.getMessages(request, callResult, null);
             if (ServiceUtil.isError(callResult)) {

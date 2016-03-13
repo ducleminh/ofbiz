@@ -213,6 +213,7 @@
         <attribute type="String" mode="IN" name="quantityRejected" optional="false"/>
         <attribute type="String" mode="IN" name="unitCost" optional="false"/>
         <attribute type="List" mode="OUT" name="orderItems" optional="false"/>
+        <attribute type="Boolean" mode="OUT" name="success" optional="true"/>
     </service>
 
     <service name="createInventoryItems" engine="java"
@@ -258,6 +259,21 @@
         <attribute type="List" mode="OUT" name="permissions" optional="true"/>
         <attribute type="Boolean" mode="OUT" name="success" optional="false"/>
         <attribute type="Boolean" mode="OUT" name="isOwner" optional="false"/>
+    </service>
+
+    <service name="easyPOSCreateNewCustomer" engine="simple"
+             location="component://party/script/org/ofbiz/party/user/UserEvents.xml" invoke="createUser" auth="true">
+        <description>Service to create a new customer for store</description>
+        <attribute type="String" mode="IN" name="PRODUCT_STORE_ID" optional="false"/>
+        <attribute type="String" mode="IN" name="USER_FIRST_NAME" optional="false"/>
+        <attribute type="String" mode="IN" name="USER_LAST_NAME" optional="false"/>
+        <attribute type="String" mode="IN" name="require_email" optional="false"/>
+        <attribute type="String" mode="IN" name="require_phone" optional="false"/>
+        <attribute type="String" mode="IN" name="require_login" optional="false"/>
+        <attribute type="String" mode="IN" name="roleTypeId" optional="false"/>
+        <attribute type="String" mode="IN" name="USE_ADDRESS" optional="false"/>
+        <attribute type="String" mode="IN" name="USER_EMAIL" optional="false"/>
+        <attribute type="String" mode="OUT" name="partyId" optional="false"/>
     </service>
 
 </services>

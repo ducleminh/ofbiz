@@ -554,12 +554,18 @@ public class CheckOutHelper {
     }
 
     public Map<String, Object> createOrder(GenericValue userLogin) {
-        return createOrder(userLogin, null, null, null, false, null, cart.getWebSiteId());
+        return createOrder(userLogin, null, null, null, false, null, cart.getWebSiteId(), 0);
     }
 
     // Create order event - uses createOrder service for processing
-    public Map<String, Object> createOrder(GenericValue userLogin, String distributorId, String affiliateId,
-            List<GenericValue> trackingCodeOrders, boolean areOrderItemsExploded, String visitId, String webSiteId) {
+    public Map<String, Object> createOrder(GenericValue userLogin,
+                                           String distributorId,
+                                           String affiliateId,
+                                           List<GenericValue> trackingCodeOrders,
+                                           boolean areOrderItemsExploded,
+                                           String visitId,
+                                           String webSiteId,
+                                           long orderDateTimeOffset) {
         if (this.cart == null) {
             return null;
         }
@@ -573,6 +579,10 @@ public class CheckOutHelper {
 
         // store the order - build the context
         Map<String, Object> context = this.cart.makeCartMap(this.dispatcher, areOrderItemsExploded);
+
+        //Override the orderDate
+        Timestamp orderDateTimeStamp = new Timestamp(orderDateTimeOffset);
+        context.put("orderDate", orderDateTimeStamp);
 
         //get the TrackingCodeOrder List
         context.put("trackingCodeOrders", trackingCodeOrders);

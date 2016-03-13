@@ -130,6 +130,13 @@ public class OrderManagerEvents {
         String orderId = request.getParameter("orderId");
         String partyId = request.getParameter("partyId");
 
+        if (orderId == null || orderId.length() == 0) {
+            orderId = (String) request.getAttribute("orderId");
+        }
+        if (partyId == null || partyId.length() == 0) {
+            partyId = (String) request.getAttribute("partyId");
+        }
+
         // get the order header & payment preferences
         GenericValue orderHeader = null;
         try {
