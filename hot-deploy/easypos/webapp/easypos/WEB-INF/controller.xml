@@ -104,8 +104,8 @@
     </request-map>
 
     <request-map uri="easyPOSCompleteSalesOrder">
-        <security auth="true" https="true"/>
-        <event type="service" invoke="completeSalesOrder"></event>
+        <security https="true" auth="true"/>
+        <event type="java" path="org.easypos.order.sales.EasyPosSalesOrderWorker" invoke="completePaymentInventoryAndOrder"/>
         <response name="success" type="request" value="json"></response>
         <response name="error" type="request" value="json"></response>
     </request-map>

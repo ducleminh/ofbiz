@@ -449,6 +449,67 @@ public class EasyPosSalesOrderWorker {
         return returnedValues;
     }
 
+    public static String completePaymentInventoryAndOrder(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, GenericEntityException, GenericServiceException {
+        GenericValue userLoginGenericValue = (GenericValue) request.getSession().getAttribute("userLogin");
+        GenericDelegator delegator = (GenericDelegator) DelegatorFactory.getDelegator("default");
+        LocalDispatcher dispatcher = ServiceContainer.getLocalDispatcher("default", delegator);
+
+        String facilityId = request.getParameter("facilityId");
+        String inventoryItemTypeId = request.getParameter("inventoryItemTypeId");
+        String quantityRejected = request.getParameter("quantityRejected");
+        String unitCost = request.getParameter("unitCost");
+        String orderId = request.getParameter("orderId");
+        String invoicePerShipment = request.getParameter("invoicePerShipment");
+        String setItemStatus = request.getParameter("setItemStatus");
+        List<String> productAndQuantity = Arrays.asList(request.getParameterMap().get("productAndQuantity"));
+
+        Map<String, Object> paramMap;
+        Map<String, Object> serviceResult;
+
+        //Create order payment
+        String result = receiveOfflinePaymentForSalesOrder(request, response);
+        if (Objects.equals(ResponseConstants.RESPONSE_ERROR, result)) {
+            return ResponseConstants.RESPONSE_ERROR;
+        }
+        response.addHeader("success", "false");
+        /***************************************************/
+
+        //Now create the invetory items
+        paramMap = UtilMisc.toMap(
+                "facilityId", facilityId,
+                "productAndQuantity", productAndQuantity,
+                "inventoryItemTypeId", inventoryItemTypeId,
+                "quantityRejected", quantityRejected,
+                "unitCost", unitCost,
+                "userLogin", userLoginGenericValue
+        );
+        serviceResult = dispatcher.runSync("createInventoryItems", paramMap);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            throw new GenericServiceException("Unable to create inventory items");
+        }
+        /***************************************************/
+
+        //create success, now complete the order
+        paramMap = UtilMisc.toMap(
+                "orderId", orderId,
+                "invoicePerShipment", invoicePerShipment,
+                "facilityId", facilityId,
+                "setItemStatus", setItemStatus,
+                "userLogin", userLoginGenericValue
+        );
+
+        serviceResult = dispatcher.runSync("completeSalesOrder", paramMap);
+        if (ServiceUtil.isError(serviceResult) || ServiceUtil.isFailure(serviceResult)) {
+            throw new GenericServiceException("Unable to complete sales order");
+        }
+        /***************************************************/
+
+        request.setAttribute("success", true);
+
+        return ResponseConstants.RESPONSE_SUCCESS;
+    }
+
     public static Map<String, Object> completeSalesOrder(DispatchContext dctx,
                                                        Map<String, ? extends Object> context)
             throws GenericServiceException {
@@ -564,7 +625,6 @@ public class EasyPosSalesOrderWorker {
         }
 
         response.addHeader("success", "true");
-        request.setAttribute("test", "test");
 
         return "success";
     }
