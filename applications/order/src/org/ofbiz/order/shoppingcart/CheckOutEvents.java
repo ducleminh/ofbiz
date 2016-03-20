@@ -442,8 +442,18 @@ public class CheckOutEvents {
                 orderDateTimeOffset = 0;
             }
         }
+        String billToCustomerId = (String) request.getAttribute("billToCustomerPartyId");
 
-        callResult = checkOutHelper.createOrder(userLogin, distributorId, affiliateId, trackingCodeOrders, areOrderItemsExploded, visitId, webSiteId, orderDateTimeOffset);
+        callResult = checkOutHelper.createOrder(
+                userLogin,
+                distributorId,
+                affiliateId,
+                trackingCodeOrders,
+                areOrderItemsExploded,
+                visitId,
+                webSiteId,
+                orderDateTimeOffset,
+                billToCustomerId);
         if (callResult != null) {
             ServiceUtil.getMessages(request, callResult, null);
             if (ServiceUtil.isError(callResult)) {

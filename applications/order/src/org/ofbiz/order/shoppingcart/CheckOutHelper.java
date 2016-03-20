@@ -554,7 +554,7 @@ public class CheckOutHelper {
     }
 
     public Map<String, Object> createOrder(GenericValue userLogin) {
-        return createOrder(userLogin, null, null, null, false, null, cart.getWebSiteId(), 0);
+        return createOrder(userLogin, null, null, null, false, null, cart.getWebSiteId(), 0, null);
     }
 
     // Create order event - uses createOrder service for processing
@@ -565,7 +565,8 @@ public class CheckOutHelper {
                                            boolean areOrderItemsExploded,
                                            String visitId,
                                            String webSiteId,
-                                           long orderDateTimeOffset) {
+                                           long orderDateTimeOffset,
+                                           String billToCustomerId) {
         if (this.cart == null) {
             return null;
         }
@@ -600,6 +601,9 @@ public class CheckOutHelper {
         }
         context.put("webSiteId", webSiteId);
         context.put("originOrderId", originOrderId);
+        if (UtilValidate.isNotEmpty(billToCustomerId)) {
+            context.put("billToCustomerPartyId", billToCustomerId);
+        }
 
         // need the partyId; don't use userLogin in case of an order via order mgr
         String partyId = this.cart.getPartyId();

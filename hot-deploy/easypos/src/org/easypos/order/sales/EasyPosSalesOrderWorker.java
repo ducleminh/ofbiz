@@ -225,6 +225,7 @@ public class EasyPosSalesOrderWorker {
         }
 
         request.setAttribute("partyId", customerId);
+        request.setAttribute("billToCustomerPartyId", customerId);
         /***************************************************/
 
         //Create new sales order
